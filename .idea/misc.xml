@@ -3,4 +3,5 @@
   <component name="Black">
     <option name="sdkName" value="Python 3.13 (braille_web_api)" />
   </component>
+  <component name="ProjectRootManager" version="2" project-jdk-name="Python 3.13 (Tai_to_braille_web_api)" project-jdk-type="Python SDK" />
 </project>

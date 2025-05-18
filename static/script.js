@@ -17,7 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const brailleOutput = document.getElementById("outputBraille");
         brailleOutput.value = data.braille;
 
-        // 自動複製功能（使用 document.execCommand 確保支援度）
+        // 自動複製功能
         brailleOutput.focus();
         brailleOutput.select();
 
@@ -35,17 +35,14 @@ document.addEventListener('DOMContentLoaded', function () {
   // 手動複製功能
   document.getElementById("copyBtn").addEventListener("click", function () {
     const brailleText = document.getElementById("outputBraille").value;
-
     if (!brailleText) {
       alert("目前沒有可複製的點字內容！");
       return;
     }
 
     navigator.clipboard.writeText(brailleText)
-      .then(() => {
-        alert("點字內容已複製到剪貼簿！");
-      })
-      .catch((err) => {
+      .then(() => alert("點字內容已複製到剪貼簿！"))
+      .catch(err => {
         console.error("複製失敗:", err);
         alert("無法複製點字，請手動選取！");
       });
@@ -58,29 +55,31 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById("copyStatus").textContent = "";
   }
 
-  // 更新背景顏色與字體顏色
+  // 欄位背景顏色調整
   document.getElementById("bgColor").addEventListener("input", (e) => {
-    document.body.style.backgroundColor = e.target.value;
+    const color = e.target.value;
+    document.getElementById("inputText").style.backgroundColor = color;
+    document.getElementById("outputBraille").style.backgroundColor = color;
   });
 
-  document.getElementById("fontColor").addEventListener("input", (e) => {
-    document.body.style.color = e.target.value;
+  // 欄位文字顏色調整
+  document.getElementById("textColor").addEventListener("input", (e) => {
+    const color = e.target.value;
+    document.getElementById("inputText").style.color = color;
+    document.getElementById("outputBraille").style.color = color;
   });
 
-  // 更新字體大小
-  const slider = document.getElementById('fontSizeSlider');
-  const fontSizeValue = document.getElementById('fontSizeValue');
-  const brailleDisplay = document.getElementById('outputBraille');
+  // 字體大小調整
+  const fontSizeSlider = document.getElementById("fontSizeSlider");
+  fontSizeSlider.addEventListener("input", () => {
+    const size = fontSizeSlider.value + "px";
+    document.getElementById("inputText").style.fontSize = size;
+    document.getElementById("outputBraille").style.fontSize = size;
+   document.getElementById("fontSizeValue").textContent = size;
 
-  if (slider && fontSizeValue && brailleDisplay) {
-    slider.addEventListener('input', function () {
-      const size = `${this.value}px`;
-      fontSizeValue.textContent = size;
-      brailleDisplay.style.fontSize = size;
-    });
-  }
+  });
 
-  // 綁定按鈕事件
+  // 按鈕綁定
   document.getElementById("convertBtn").addEventListener("click", convertBraille);
   document.getElementById("clearBtn").addEventListener("click", clearText);
 });

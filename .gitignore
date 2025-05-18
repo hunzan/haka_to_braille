@@ -19,3 +19,4 @@ node_modules/
 # 如果你用 virtualenv 建虛擬環境
 venv/
 env/
+venv1/
