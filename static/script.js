@@ -2,22 +2,24 @@ document.addEventListener('DOMContentLoaded', function () {
   // 轉換台羅拼音為台語點字
   function convertBraille() {
     const text = document.getElementById("inputText").value.trim();
+    const inputMode = document.getElementById("inputType").value; // 取得輸入模式
+
     if (text === "") {
-      alert("請輸入台羅拼音！");
+      alert("請輸入台羅或 POJ 拼音！");
       return;
     }
 
     fetch("/convert", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
+      body: JSON.stringify({ text, inputMode })  // ✅ 把 inputMode 傳給後端
     })
       .then(response => response.json())
       .then(data => {
         const brailleOutput = document.getElementById("outputBraille");
         brailleOutput.value = data.braille;
 
-        // 自動複製功能
+                // 自動複製功能
         brailleOutput.focus();
         brailleOutput.select();
 
@@ -29,7 +31,11 @@ document.addEventListener('DOMContentLoaded', function () {
           console.error("複製時發生錯誤：", err);
           document.getElementById("copyStatus").textContent = "點字轉換完成，但複製失敗。";
         }
-      });
+      })
+      .catch(error => {
+        console.error("錯誤發生：", error);
+        alert("轉換失敗，請稍後再試！");
+    });
   }
 
   // 手動複製功能

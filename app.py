@@ -10,26 +10,33 @@ CONSONANTS_FILE = os.path.join(DATA_DIR, 'consonants.json')
 VOWELS_FILE = os.path.join(DATA_DIR, 'vowels_all.json')
 RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
 NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
+POJ_DIFF_FILE = os.path.join(DATA_DIR, 'tl_to_poj_diff.json')
 
+# ✅ 建議使用函式來載入 JSON
 def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# 🔹 載入 JSON 資料
-DATA_DIR = os.path.join(os.path.dirname(__file__), 'braille_data')
-CONSONANTS_FILE = os.path.join(DATA_DIR, 'consonants.json')
-VOWELS_FILE = os.path.join(DATA_DIR, 'vowels_all.json')
-RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
-NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
-
-def load_json(filepath):
-    with open(filepath, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
+# ✅ 正確載入所有表
 consonants = load_json(CONSONANTS_FILE)
 vowels = load_json(VOWELS_FILE)
 rushio = load_json(RUSHIO_FILE)
 nasal = load_json(NASAL_FILE)
+tl_to_poj = load_json(POJ_DIFF_FILE)
+
+# ✅ 建立 POJ ➜ 台羅轉換表（反轉）
+poj_to_tl = {v: k for k, v in tl_to_poj.items()}
+sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))  # 長的先比對
+
+def poj_to_tl_text(text):
+    # 🧠 預處理：ⁿ 換成 nn
+    text = text.replace("ⁿ", "nn")
+
+    # 🔁 使用排序過的 key，確保長的字串先被處理（避免 ua 被 oa 取代）
+    for poj in sorted_poj_keys:
+        text = text.replace(poj, poj_to_tl[poj])
+
+    return text
 
 # 🔹 切音節函式
 def split_syllables(word):
@@ -116,18 +123,28 @@ def convert_syllable(s):
 def convert():
     data = request.json
     text = data.get("text", "").strip()
+    input_type = data.get("inputMode", "tl")  # 預設是台羅
 
+    # 如果是 POJ 輸入，先轉成台羅再處理
+    if input_type == "poj":
+        # 先處理鼻音符號
+        text = text.replace('ⁿ', 'nn')
+        # 再處理 POJ 對應台羅
+        for poj in sorted_poj_keys:
+            tl = poj_to_tl[poj]
+            text = text.replace(poj, tl)
+
+    # 下面是原本流程：分行、分詞、分音節、轉點字
     result_lines = []
     for line in text.splitlines():  # 🔸 分行處理
         result_words = []
         for word in line.split():  # 🔸 每行內分詞
             syllables = split_syllables(word)
-            braille = ''.join(convert_syllable(s) for s in syllables)  # ✅ 不要再砍 ⠤
+            braille = ''.join(convert_syllable(s) for s in syllables)
             result_words.append(braille)
-        result_lines.append(" ".join(result_words))  # 🔸 該行組合起來
+        result_lines.append(" ".join(result_words))
 
     final_output = "\n".join(result_lines)  # 🔸 回復原始輸入的斷行格式
-
     return jsonify({"braille": final_output})
 
 # 🔹 首頁（前端介面）
