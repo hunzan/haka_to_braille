@@ -1,8 +1,13 @@
 import os
 import json
 from flask import Flask, request, jsonify, render_template, send_from_directory
+from line_bot import line_callback
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__, static_folder="static")
+
+app.add_url_rule('/callback', view_func=line_callback, methods=['POST'])
 
 # 🔹 載入 JSON 資料
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'braille_data')
@@ -116,35 +121,37 @@ def convert_syllable(s):
         return vowels[s]["dots"]
 
     # 無法處理的音節
-    return '[錯誤]'
+    return
 
-# 🔹 主要 API 端點
-@app.route("/convert", methods=["POST"])
-def convert():
-    data = request.json
-    text = data.get("text", "").strip()
-    input_type = data.get("inputMode", "tl")  # 預設是台羅
+def convert_text_to_braille(text, input_type="tl"):
+    text = text.strip()
 
-    # 如果是 POJ 輸入，先轉成台羅再處理
     if input_type == "poj":
-        # 先處理鼻音符號
         text = text.replace('ⁿ', 'nn')
-        # 再處理 POJ 對應台羅
         for poj in sorted_poj_keys:
             tl = poj_to_tl[poj]
             text = text.replace(poj, tl)
 
-    # 下面是原本流程：分行、分詞、分音節、轉點字
     result_lines = []
-    for line in text.splitlines():  # 🔸 分行處理
+    for line in text.splitlines():
         result_words = []
-        for word in line.split():  # 🔸 每行內分詞
+        for word in line.split():
             syllables = split_syllables(word)
             braille = ''.join(convert_syllable(s) for s in syllables)
             result_words.append(braille)
         result_lines.append(" ".join(result_words))
 
-    final_output = "\n".join(result_lines)  # 🔸 回復原始輸入的斷行格式
+    return "\n".join(result_lines)
+
+# 🔹 主要 API 端點
+@app.route("/convert", methods=["POST"])
+def convert():
+    data = request.json
+    text = data.get("text", "")
+    input_type = data.get("inputMode", "tl")
+
+    final_output = convert_text_to_braille(text, input_type)
+
     return jsonify({"braille": final_output})
 
 # 🔹 首頁（前端介面）
