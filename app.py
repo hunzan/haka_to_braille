@@ -121,7 +121,7 @@ def convert_syllable(s):
         return vowels[s]["dots"]
 
     # 無法處理的音節
-    return
+    return '[錯誤]'
 
 def convert_text_to_braille(text, input_type="tl"):
     text = text.strip()
@@ -137,7 +137,7 @@ def convert_text_to_braille(text, input_type="tl"):
         result_words = []
         for word in line.split():
             syllables = split_syllables(word)
-            braille = ''.join(convert_syllable(s) for s in syllables)
+            braille = ''.join(convert_syllable(s) or '[錯誤]' for s in syllables)
             result_words.append(braille)
         result_lines.append(" ".join(result_words))
 
