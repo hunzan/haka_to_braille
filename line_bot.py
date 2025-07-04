@@ -45,16 +45,16 @@ def handle_message(event):
     elif user_message in ["目前模式", "模式", "mode"]:
         mode = user_modes.get(user_id, "tl")
         reply = f"目前輸入模式：{'台羅拼音' if mode == 'tl' else 'POJ'}"
-    elif user_message in ["說明", "幫助", "help", "指令"]:
+    elif user_message in ["說明", "幫助", "help", "指令", "金蕉"]:
         # 🔸 傳送帶按鈕的快速選單
-        reply = "👉 請選擇輸入模式："
+        reply = "選擇輸入模式👉"
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(
                 text=reply,
                 quick_reply=QuickReply(
                     items=[
-                        QuickReplyButton(action=MessageAction(label="🍌台羅拼音", text="台羅")),
+                        QuickReplyButton(action=MessageAction(label="🍌台羅", text="台羅")),
                         QuickReplyButton(action=MessageAction(label="🧋POJ", text="白話字")),
                         QuickReplyButton(action=MessageAction(label="🔎目前模式", text="模式")),
                     ]
