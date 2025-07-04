@@ -3,7 +3,7 @@ from flask import request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage
-from app import convert_text_to_braille
+from converter import convert_text_to_braille
 from dotenv import load_dotenv
 
 load_dotenv()
