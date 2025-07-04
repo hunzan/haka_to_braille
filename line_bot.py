@@ -29,7 +29,6 @@ def line_callback():
 
     return 'OK'
 
-
 @handler.add(MessageEvent, message=TextMessage)
 def handle_message(event):
     user_id = event.source.user_id
@@ -39,12 +38,15 @@ def handle_message(event):
     if user_message in ["poj", "白話字", "白話"]:
         user_modes[user_id] = "poj"
         reply = "✅ 已切換為 POJ 輸入模式"
+
     elif user_message in ["tl", "台羅", "台羅拼音", "台羅音"]:
         user_modes[user_id] = "tl"
         reply = "✅ 已切換為台羅拼音輸入模式"
+
     elif user_message in ["目前模式", "模式", "mode"]:
         mode = user_modes.get(user_id, "tl")
         reply = f"目前輸入模式：{'台羅拼音' if mode == 'tl' else 'POJ'}"
+
     elif user_message in ["說明", "幫助", "help", "指令", "金蕉"]:
         # 🔸 傳送帶按鈕的快速選單
         reply = "選擇輸入模式👉"
@@ -63,14 +65,53 @@ def handle_message(event):
         )
         return  # 已回覆，不繼續下面程式
 
+    elif user_message in ["贊助", "支持", "donate"]:
+        reply = "💛 請選擇要請我吃什麼："
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(
+                text=reply,
+                quick_reply=QuickReply(
+                    items=[
+                        QuickReplyButton(
+                            action=URIAction(
+                                label="🧋請我們喝珍奶",
+                                uri="https://www.paypal.me/AkauKimchio"
+                            )
+                        ),
+                        QuickReplyButton(
+                            action=URIAction(
+                                label="🍌請我們吃香蕉",
+                                uri="https://www.paypal.me/AkauKimchio"
+                            )
+                        ),
+                        QuickReplyButton(
+                            action=URIAction(
+                                label=" 🍱請我們吃便當",
+                                uri="https://www.paypal.me/AkauKimchio"
+                            )
+                        ),
+                        QuickReplyButton(
+                            action=URIAction(
+                                label="🥤請我們喝拿鐵",
+                                uri="https://www.paypal.me/AkauKimchio"
+                            )
+                        ),
+                    ]
+                )
+            )
+        )
+        return  # 已回覆，不繼續下面程式
+
     else:
         # 🔸 正常轉換文字
         input_mode = user_modes.get(user_id, "tl")  # 預設台羅
         result = convert_text_to_braille(user_message, input_mode)
         reply = f"🔸 轉換結果：\n{result}"
 
-    # 🔸 回覆訊息（除了「說明」外其他情況）
+    # 🔸 回覆訊息（除了說明與贊助以外）
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
     )
+
