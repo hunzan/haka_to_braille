@@ -2,10 +2,12 @@ import os
 from flask import request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import MessageEvent, TextMessage, TextSendMessage
 from converter import convert_text_to_braille
 from dotenv import load_dotenv
-from linebot.models import QuickReply, QuickReplyButton, MessageAction
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage,
+    QuickReply, QuickReplyButton, MessageAction
+)
 
 load_dotenv()
 
@@ -34,7 +36,7 @@ def handle_message(event):
     user_message = event.message.text.strip().lower()
 
     # 🔸 處理指令
-    if user_message in ["poj", "po", "白話字", "白話"]:
+    if user_message in ["poj", "白話字", "白話"]:
         user_modes[user_id] = "poj"
         reply = "✅ 已切換為 POJ 輸入模式"
     elif user_message in ["tl", "台羅", "台羅拼音", "台羅音"]:
@@ -44,6 +46,7 @@ def handle_message(event):
         mode = user_modes.get(user_id, "tl")
         reply = f"目前輸入模式：{'台羅拼音' if mode == 'tl' else 'POJ'}"
     elif user_message in ["說明", "幫助", "help", "指令"]:
+        # 🔸 傳送帶按鈕的快速選單
         reply = "📄 請選擇操作："
         line_bot_api.reply_message(
             event.reply_token,
@@ -58,7 +61,7 @@ def handle_message(event):
                 )
             )
         )
-        return  # 記得這裡 return，不然會跑到下面重複回覆
+        return  # 已回覆，不繼續下面程式
 
     else:
         # 🔸 正常轉換文字
@@ -66,7 +69,7 @@ def handle_message(event):
         result = convert_text_to_braille(user_message, input_mode)
         reply = f"🔸 轉換結果：\n{result}"
 
-    # 🔸 回覆訊息
+    # 🔸 回覆訊息（除了「說明」外其他情況）
     line_bot_api.reply_message(
         event.reply_token,
         TextSendMessage(text=reply)
