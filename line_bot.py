@@ -69,7 +69,7 @@ def handle_message(event):
         # 🔸 正常轉換文字
         input_mode = user_modes.get(user_id, "tl")  # 預設台羅
         result = convert_text_to_braille(user_message, input_mode)
-        reply = f"🔸 轉換結果：\n{result}"
+        reply = f"🔄 轉換結果：\n{result}"
 
     # 🔸 回覆訊息（除了說明與贊助以外）
     line_bot_api.reply_message(
