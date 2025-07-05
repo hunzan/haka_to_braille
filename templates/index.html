@@ -7,6 +7,17 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
 
     <style>
+    @media (max-width: 640px) {
+    .corner-link {
+      top: auto;
+      bottom: 10px;  /* 移到畫面下方 */
+      right: 10px;
+    }
+    .resized-img {
+      width: 60px; /* 縮小圖示，避免佔空間 */
+    }
+  }
+
     /* 可選：讓圖片在 hover 時有些變化 */
   .resized-img:hover {
       opacity: 0.8;
@@ -62,10 +73,9 @@
         台語點字轉羅馬拼音
       </button>
     </a>
-    <a href="https://chhoe.taigi.info/" target="_blank" class="corner-link">
+    <a href="https://chhoe.taigi.info/" target="_blank" class="corner-link" aria-label="前往台語辭典外部網站">
         <img src="{{ url_for('static', filename='dict.png') }}"
              alt="點選打開全台灣最豐富的線上台語辭典平台"
-             width="300" height="200"
              class="resized-img">
     </a>
 
