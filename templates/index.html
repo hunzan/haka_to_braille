@@ -23,14 +23,15 @@
     width: 100px;  /* 建議縮小一點，不然 300x200 可能太大 */
     height: auto;  /* 自動等比例縮放 */
   }
-      @media (max-width: 640px) {
+    @media (max-width: 640px) {
     .corner-link {
-      top: auto;
-      bottom: 10px;  /* 移到畫面下方 */
+      top: 50%;
+      bottom: auto;
       right: 10px;
+      transform: translateY(-50%);  /* 垂直置中 */
     }
     .resized-img {
-      width: 60px; /* 縮小圖示，避免佔空間 */
+      width: 70px; /* 縮小圖示，避免佔空間 */
     }
   }
 
