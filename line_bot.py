@@ -65,44 +65,6 @@ def handle_message(event):
         )
         return  # 已回覆，不繼續下面程式
 
-    elif user_message in ["贊助", "支持", "donate"]:
-        reply = "💛 請選擇要請我吃什麼："
-        line_bot_api.reply_message(
-            event.reply_token,
-            TextSendMessage(
-                text=reply,
-                quick_reply=QuickReply(
-                    items=[
-                        QuickReplyButton(
-                            action=URIAction(
-                                label="🧋請我們喝珍奶",
-                                uri="https://www.paypal.me/AkauKimchio"
-                            )
-                        ),
-                        QuickReplyButton(
-                            action=URIAction(
-                                label="🍌請我們吃香蕉",
-                                uri="https://www.paypal.me/AkauKimchio"
-                            )
-                        ),
-                        QuickReplyButton(
-                            action=URIAction(
-                                label=" 🍱請我們吃便當",
-                                uri="https://www.paypal.me/AkauKimchio"
-                            )
-                        ),
-                        QuickReplyButton(
-                            action=URIAction(
-                                label="🥤請我們喝拿鐵",
-                                uri="https://www.paypal.me/AkauKimchio"
-                            )
-                        ),
-                    ]
-                )
-            )
-        )
-        return  # 已回覆，不繼續下面程式
-
     else:
         # 🔸 正常轉換文字
         input_mode = user_modes.get(user_id, "tl")  # 預設台羅
