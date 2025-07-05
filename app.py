@@ -33,6 +33,10 @@ def index():
 def favicon():
     return send_from_directory('static', 'favicon.ico', mimetype='image/vnd.microsoft.icon')
 
+@app.route('/support_us')
+def support_us():
+    return render_template('support_us.html')
+
 # 🔹 啟動 Flask 伺服器（開發用）
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
