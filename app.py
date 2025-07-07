@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from dotenv import load_dotenv
 from converter import convert_text_to_braille
