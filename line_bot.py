@@ -47,6 +47,10 @@ def handle_message(event):
         mode = user_modes.get(user_id, "tl")
         reply = f"目前輸入模式：{'台羅拼音' if mode == 'tl' else 'POJ'}"
 
+    elif user_message == "更新資料":
+        reload_data()
+        reply = "📦 已重新載入 JSON 資料表！"
+
     elif user_message in ["說明", "幫助", "help", "指令", "金蕉"]:
         # 🔸 傳送帶按鈕的快速選單
         reply = "選擇輸入模式👉"

@@ -12,21 +12,24 @@ RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
 NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
 POJ_DIFF_FILE = os.path.join(DATA_DIR, 'tl_to_poj_diff.json')
 
-# ✅ 建議使用函式來載入 JSON
+# ✅ 全域變數初始化
 def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# ✅ 正確載入所有表
-consonants = load_json(CONSONANTS_FILE)
-vowels = load_json(VOWELS_FILE)
-rushio = load_json(RUSHIO_FILE)
-nasal = load_json(NASAL_FILE)
-tl_to_poj = load_json(POJ_DIFF_FILE)
+def reload_data():
+    """手動重新載入 JSON 資料表"""
+    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys
+    consonants = load_json(CONSONANTS_FILE)
+    vowels = load_json(VOWELS_FILE)
+    rushio = load_json(RUSHIO_FILE)
+    nasal = load_json(NASAL_FILE)
+    tl_to_poj = load_json(POJ_DIFF_FILE)
+    poj_to_tl = {v: k for k, v in tl_to_poj.items()}
+    sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))
 
-# ✅ 建立 POJ ➜ 台羅轉換表（反轉）
-poj_to_tl = {v: k for k, v in tl_to_poj.items()}
-sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))  # 長的先比對
+# ✅ 啟動時就先載入
+reload_data()
 
 def poj_to_tl_text(text):
     # 🧠 預處理：ⁿ 換成 nn
