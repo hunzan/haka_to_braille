@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputMode = document.getElementById("inputType").value; // 取得輸入模式
 
     if (text === "") {
-      alert("請輸入台羅或 POJ 拼音！");
+      alert("請輸入客語拼音，使用音調調號，不要用數字調號喔！");
       return;
     }
 

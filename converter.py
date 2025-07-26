@@ -1,141 +1,212 @@
 import os
 import json
+import re
 from dotenv import load_dotenv
 
-load_dotenv()
-
-# 🔹 載入 JSON 資料
+# ✅ 放在最前面！先定義資料夾路徑
 DATA_DIR = os.path.join(os.path.dirname(__file__), 'braille_data')
-CONSONANTS_FILE = os.path.join(DATA_DIR, 'consonants.json')
-VOWELS_FILE = os.path.join(DATA_DIR, 'vowels_all.json')
+
+# ✅ 檔案路徑定義
+CONSONANTS_HPZT_FILE = os.path.join(DATA_DIR, 'consonants_hpzt.json')  # 海陸、大埔、饒平、詔安
+CONSONANTS_SIIAN2_FILE = os.path.join(DATA_DIR, 'consonants_siian2.json')  # 四縣、南四縣
+VOWELS_FILE = os.path.join(DATA_DIR, 'vowels.json')
 RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
-NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
-POJ_DIFF_FILE = os.path.join(DATA_DIR, 'tl_to_poj_diff.json')
+TONE_HPZT_FILE = os.path.join(DATA_DIR, 'tone_hpzt.json')
+TONE_SIIAN2_FILE = os.path.join(DATA_DIR, 'tone_siian2.json')
+
+load_dotenv()
 
 # ✅ 全域變數初始化
 def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-def reload_data():
-    """手動重新載入 JSON 資料表"""
-    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys
-    consonants = load_json(CONSONANTS_FILE)
-    vowels = load_json(VOWELS_FILE)
-    rushio = load_json(RUSHIO_FILE)
-    nasal = load_json(NASAL_FILE)
-    tl_to_poj = load_json(POJ_DIFF_FILE)
-    poj_to_tl = {v: k for k, v in tl_to_poj.items()}
-    sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))
+# ✅ 2. 自動分音節函式 ← 林北建議放這裡
+def split_syllables_auto(text, tones, rushio):
+    # 1. 取出所有 tone 符號做成 pattern
+    tone_marks = sorted(tones.keys(), key=len, reverse=True)
+    escaped_marks = [re.escape(mark) for mark in tone_marks if mark]
+    tone_pattern = f"(?:{'|'.join(escaped_marks)})?"
 
-# ✅ 啟動時就先載入
-reload_data()
+    # 2. rushio 先處理：音節不加 tone 符號
+    rushio_keys = sorted(rushio.keys(), key=len, reverse=True)
+    rushio_pattern = '|'.join(re.escape(k) for k in rushio_keys)
 
-def poj_to_tl_text(text):
-    # 🧠 預處理：ⁿ 換成 nn
-    text = text.replace("ⁿ", "nn")
+    # 3. 其他拼音音節：允許接 tone 符號
+    normal_pattern = f"[a-zA-Z]+{tone_pattern}"
 
-    # 🔁 使用排序過的 key，確保長的字串先被處理（避免 ua 被 oa 取代）
-    for poj in sorted_poj_keys:
-        text = text.replace(poj, poj_to_tl[poj])
+    # 4. 總 pattern：rushio 在前（優先），再一般拼音
+    pattern = re.compile(f"({rushio_pattern}|{normal_pattern})")
 
-    return text
+    return [m.group(0) for m in pattern.finditer(text)]
 
-# 🔹 切音節函式
-def split_syllables(word):
-    # 優先使用連字符來斷音節
-    return word.split('-')
-    i = 0
+def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
+    sixth_dot = ""
 
-    while i < len(word):
-        match = None  # ✅ 初始化匹配變數
+    syll = syll.strip()
 
-        # 先檢查 rushio_syllables 是否獨立匹配
-        for r in sorted(rushio.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(r):
-                result.append(r)
-                i += len(r)
-                match = r
-                break
-
-        # 再檢查 vowels 是否能獨立匹配
-        for v in sorted(vowels.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(v):
-                result.append(v)
-                i += len(v)
-                match = v  # ✅ 確保 match 存的是字串，而非布林值
-                break
-
-        # 然後檢查 consonants + vowels / nasal / rushio
-        for c in sorted(consonants.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(c):
-                for v in sorted(vowels.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(v):
-                        match = c + v
-                        break
-                for r in sorted(rushio.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(r):
-                        match = c + r
-                        break
-                for n in sorted(nasal.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(n):
-                        match = c + n
-                        break
-                if match:
-                    result.append(match)
-                    i += len(match)
-                    break
-
-        if match is None:
-            result.append('[錯誤]')
+    # ✅ 特例：跳過 ii，處理 iin / iim（含子音開頭情況）
+    base_syll = syll
+    tone_mark = ""
+    for mark in tones:
+        if mark and mark in base_syll:
+            tone_mark = mark
+            base_syll = base_syll.replace(mark, "")
             break
 
-    return result
+    if base_syll.endswith("iim") or base_syll.endswith("iin"):
+        if base_syll.endswith("iim"):
+            base = base_syll[:-3]
+            coda = "m"
+        else:
+            base = base_syll[:-3]
+            coda = "n"
 
-# 🔹 轉換為點字（包含純母音含聲調處理）
-def convert_syllable(s):
-    # 直接對應整個音節（完整拼音）優先處理
-    if s in nasal:
-        return "⠠" + nasal[s]["dots"]
-    if s in rushio:
-        return rushio[s]["dots"]
-    if s in vowels:
-        return vowels[s]["dots"]
+        parts = [sixth_dot] if sixth_dot else []
 
-    # 嘗試分拆子音與母音（或鼻音）
-    for c in sorted(consonants.keys(), key=lambda x: -len(x)):
-        if s.startswith(c):
-            rest = s[len(c):]
-            if rest in vowels:
-                return consonants[c]["dots"] + vowels[rest]["dots"]
-            elif rest in rushio:
-                return consonants[c]["dots"] + rushio[rest]["dots"]
-            elif rest in nasal:
-                return "⠠" + consonants[c]["dots"] + nasal[rest]["dots"]
+        # 有子音的情況
+        if base:
+            if base in consonants:
+                parts.append(get_dots(consonants, base))
+            else:
+                return "⍰"  # 無效子音
+        # 無子音（單獨 iim / iin）
+        parts.append(get_dots(consonants, coda))
 
-    # 補上沒聲母的純母音（含聲調）處理
-    if s in vowels:
-        return vowels[s]["dots"]
+        if tone_mark:
+            parts.append(get_dots(tones, tone_mark))
+        else:
+            parts.append("⠤")  # 無 tone 時補上 ⠤
 
-    # 無法處理的音節
-    return '[錯誤]'
+        return ''.join(parts)
 
-def convert_text_to_braille(text, input_type="tl"):
-    text = text.strip()
+    # 先把音調符號抽出（入聲不需加音調，先標記 tone_mark）
+    tone_mark = ""
+    for mark in tones.keys():
+        if mark and mark in syll:
+            tone_mark = mark
+            syll = syll.replace(mark, "")
+            break
 
-    if input_type == "poj":
-        text = text.replace('ⁿ', 'nn')
-        for poj in sorted_poj_keys:
-            tl = poj_to_tl[poj]
-            text = text.replace(poj, tl)
+    # 詔安腔 nn 特殊處理，加第六點標記
+    if dialect == "詔安" and syll.endswith("nn"):
+        sixth_dot = "⠠"
+        syll = syll[:-2]
 
-    result_lines = []
-    for line in text.splitlines():
-        result_words = []
-        for word in line.split():
-            syllables = split_syllables(word)
-            braille = ''.join(convert_syllable(s) or '[錯誤]' for s in syllables)
-            result_words.append(braille)
-        result_lines.append(" ".join(result_words))
+    # 判斷 syll 是否為 rushio（入聲），入聲不加音調
+    if syll in rushio:
+        return sixth_dot + get_dots(rushio, syll)
 
-    return "\n".join(result_lines)
+    # 嘗試拆解：子音 + rushio（入聲）
+    for r in sorted(rushio.keys(), key=lambda x: -len(x)):
+        if syll.endswith(r):
+            onset = syll[:-len(r)]
+            if onset in consonants:
+                return sixth_dot + get_dots(consonants, onset) + get_dots(rushio, r)
+
+    # 嘗試母音 vowels
+    if syll in vowels:
+        parts = [sixth_dot, get_dots(vowels, syll)]
+        if tone_mark in tones:
+            parts.append(get_dots(tones, tone_mark))
+        return ''.join(parts)
+
+    # 嘗試拆解正常音節（子音 + 母音 + coda）
+    onset, nucleus, coda = "", "", ""
+    remainder = syll
+
+    for c in sorted(consonants.keys(), key=len, reverse=True):
+        if remainder.startswith(c):
+            onset = c
+            remainder = remainder[len(c):]
+            break
+
+    for v in sorted(vowels.keys(), key=len, reverse=True):
+        if remainder.startswith(v):
+            nucleus = v
+            coda = remainder[len(v):]
+            break
+    else:
+        # 單音 m, n, ng 可能在此被判斷失敗，所以等會特別處理
+        pass
+
+    # ✅ 一開始就預設 is_rushio
+    is_rushio = False
+
+    # 若有找到母音，繼續組合
+    if nucleus:
+        parts = [sixth_dot]
+        if onset:
+            parts.append(get_dots(consonants, onset))
+        parts.append(get_dots(vowels, nucleus))
+
+        if coda:
+            if coda in rushio:
+                parts.append(get_dots(rushio, coda))
+                is_rushio = True
+            elif coda in consonants:
+                parts.append(get_dots(consonants, coda))
+            else:
+                return "⍰"
+
+        # ✅ tone 處理：只有不是入聲才會處理 tone
+        if not is_rushio:
+            if tone_mark:
+                parts.append(get_dots(tones, tone_mark))
+            else:
+                parts.append("⠤")  # 無聲調 → 補 ⠤
+
+        return ''.join(parts)
+
+    # **最後處理單音 m, n, ng （子音或母音）**
+    if syll in ["m", "n", "ng"]:
+        parts = [sixth_dot]
+        if syll in vowels:
+            parts.append(get_dots(vowels, syll))
+        elif syll in consonants:
+            parts.append(get_dots(consonants, syll))
+        else:
+            return "⍰"
+        if tone_mark in tones:
+            parts.append(get_dots(tones, tone_mark))
+        else:
+            parts.append("⠤")
+        return ''.join(parts)
+
+    # 其他狀況返回錯誤符號
+    return "⍰"
+
+def get_dots(dictionary, key):
+    return dictionary.get(key, {}).get("dots", "")
+
+def convert_text_to_braille(text, dialect):
+    if dialect in ["四縣", "南四縣"]:
+        consonants = load_json(CONSONANTS_SIIAN2_FILE)
+        tones = load_json(TONE_SIIAN2_FILE)
+    elif dialect in ["海陸", "大埔", "饒平", "詔安"]:
+        consonants = load_json(CONSONANTS_HPZT_FILE)
+        tones = load_json(TONE_HPZT_FILE)
+    else:
+        return "⚠️ 無效腔調：請選擇有效的客語腔調"
+
+    vowels = load_json(VOWELS_FILE)
+    rushio = load_json(RUSHIO_FILE)
+
+    lines = text.splitlines()
+    final_lines = []
+
+    for line in lines:
+        # ✅ 改這裡：支援 toiˇvanˇnginˇ 無空格也能切音節
+        syllables = split_syllables_auto(line.strip(), tones, rushio)
+        braille_line = []
+
+        for syll in syllables:
+            result = parse_syllable(syll, consonants, vowels, tones, rushio, dialect)
+            if result:
+                braille_line.append(result)
+            else:
+                braille_line.append("⍰")  # 轉換失敗用符號標記
+
+        final_lines.append(" ".join(braille_line))
+
+    return "\n".join(final_lines)

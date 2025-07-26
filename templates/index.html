@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>【蕉台點】羅馬拼音轉台語點字工具</title>
+  <title>【蕉客點】客語拼音轉客語點字工具</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-
     <style>
     /* 可選：讓圖片在 hover 時有些變化 */
   .resized-img:hover {
@@ -59,31 +58,30 @@
     text-align: center;
   }
   </style>
-
 </head>
 <body class="bg-yellow-100 min-h-screen flex flex-col items-center p-4 font-sans">
   <main class="flex-grow w-full max-w-6xl flex flex-col items-center">
 
-    <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉台點🍌羅馬拼音轉台語點字</h1>
+    <h1 class="text-2xl font-bold mb-4" tabindex="0">蕉客點🍌客語拼音轉客語點字工具</h1>
 
     <a href="https://brailletotl-production.up.railway.app/">
       <button style="background-color: #4CAF50; color: white;
-                     padding: 6px 12px; font-size: 14px;
+                     padding: 6px 12px; font-size: 16px;
                      border: none; border-radius: 6px; cursor: pointer;">
-        台語點字轉羅馬拼音
+        來去用客語點字轉羅馬拼音
       </button>
     </a>
-    <a href="https://chhoe.taigi.info/" target="_blank" class="corner-link" aria-label="前往台語辭典外部網站">
+    <a href="https://hakkadict.moe.edu.tw/" target="_blank" class="corner-link" aria-label="前往客語辭典外部網站">
         <img src="{{ url_for('static', filename='dict.png') }}"
-             alt="點選打開全台灣最豐富的線上台語辭典平台"
+             alt="台灣教育部客語辭典"
              class="resized-img">
     </a>
 
     <!-- 使用說明 -->
     <section id="usage" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-2 mb-4 w-full text-sm rounded"
              role="region" aria-labelledby="usageTitle" tabindex="0">
-      <p>1. 請輸入台羅或POJ台語拼音，使用正常標音方式，一律小寫字母，不用數字調號。例如：guá sī tâi-uân-lâng</p>
-      <p>2. 「om」、「uang」及「標點符號」尚未確定點字規則。「om」、「uang/oang」會顯示明眼拼音，「標點符號」請以空格代替做分隔。</p>
+      <p><strong>1. 請先選擇客語腔調，再於輸入教育部客語拼音方案之拼音，一律小寫字母，不用數字調號。例如：「ngaiˇ he toiˇvanˇnginˇ」。 </strong></p>
+      <p><strong>2. 「客語點字標點符號」尚未確定規則，詞與詞、句與句之間請以空格代替做分隔。</strong></p>
     </section>
 
 <!-- 功能設定一整排：輸入格式 + 顏色 + 字體 -->
@@ -91,10 +89,14 @@
 
   <!-- 輸入格式選單 -->
   <div class="flex items-center">
-    <label for="inputType" class="mr-2">輸入格式：</label>
-    <select id="inputType" class="p-2 border rounded bg-white">
-      <option value="tl">台羅（TL）</option>
-      <option value="poj">白話字（POJ）</option>
+    <label for="inputType" class="mr-2">選擇輸入腔調：</label>
+    <select id="inputType" name="dialect" class="p-2 border rounded bg-white">
+      <option value="四縣">四縣</option>
+      <option value="南四縣">南四縣</option>
+      <option value="海陸">海陸</option>
+      <option value="大埔">大埔</option>
+      <option value="饒平">饒平</option>
+      <option value="詔安">詔安</option>
     </select>
   </div>
 
@@ -132,8 +134,8 @@
       <div class="w-full md:w-1/2 flex flex-col">
         <textarea id="inputText"
                   class="p-2 border rounded resize-none h-48 w-full"
-                  placeholder="請輸入台羅拼音或 POJ..."
-                  aria-label="輸入框：請輸入台羅拼音或 POJ"></textarea>
+                  placeholder="請輸入客語拼音，記得先選擇腔調喔！"
+                  aria-label="輸入框：請先選擇腔調，再輸入客語拼音"></textarea>
       </div>
 
       <!-- 中間按鈕 -->
@@ -148,8 +150,8 @@
         <textarea id="outputBraille"
                   class="p-2 border rounded resize-none h-48 w-full"
                   readonly
-                  placeholder="台語點字會顯示在這裡..."
-                  aria-label="轉換結果：台語點字"
+                  placeholder="客語點字會顯示在這裡..."
+                  aria-label="轉換結果：客語點字"
                   aria-live="polite"
                   role="status"
                   tabindex="0"></textarea>
