@@ -41,6 +41,11 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
     sixth_dot = ""
     syll = syll.strip()
 
+    # ✅ 鼻音：若有 nn，加入第六點，並砍 nn 以利後續處理
+    if "nn" in syll:
+        sixth_dot = "⠠"
+        syll = syll.replace("nn", "")
+
     # ✅ 特例：處理 iim / iin（含子音或獨立）
     base_syll = syll
     tone_mark = ""
@@ -126,7 +131,7 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
 
     is_rushio = False
     if nucleus:
-        parts = [sixth_dot]
+        parts = [sixth_dot] if sixth_dot else []
         if onset:
             parts.append(get_dots(consonants, onset))
         parts.append(get_dots(vowels, nucleus))
@@ -150,7 +155,7 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
 
     # 處理單音節 m, n, ng
     if base_syll in ["m", "n", "ng"]:
-        parts = [sixth_dot]
+        parts = [sixth_dot] if sixth_dot else []
         if base_syll in vowels:
             parts.append(get_dots(vowels, base_syll))
         elif base_syll in consonants:
