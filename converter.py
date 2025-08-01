@@ -13,6 +13,7 @@ VOWELS_FILE = os.path.join(DATA_DIR, 'vowels.json')
 RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
 TONE_HPZT_FILE = os.path.join(DATA_DIR, 'tone_hpzt.json')
 TONE_SIIAN2_FILE = os.path.join(DATA_DIR, 'tone_siian2.json')
+PUNCTUATION_FILE = os.path.join(DATA_DIR, 'punctuation.json')
 
 load_dotenv()
 
@@ -23,19 +24,22 @@ def load_json(filepath):
 
 # ✅ 2. 自動分音節函式 ← 林北建議放這裡
 def split_syllables_auto(text, tones, rushio):
-    # 不處理 tone 拆解，rushio key 就是含 tone 的拼音（例如 abˋ）
     rushio_keys = sorted(rushio.keys(), key=len, reverse=True)
     rushio_pattern = '|'.join(re.escape(k) for k in rushio_keys)
 
-    # 一般音節：允許含 tone
     tone_marks = sorted(tones.keys(), key=len, reverse=True)
     escaped_marks = [re.escape(mark) for mark in tone_marks if mark]
     tone_pattern = f"(?:{'|'.join(escaped_marks)})?"
     normal_pattern = f"[a-zA-Z]+{tone_pattern}"
 
-    # rushio 在前，優先比對
-    pattern = re.compile(f"({rushio_pattern}|{normal_pattern})")
-    return [m.group(0) for m in pattern.finditer(text)]
+    # 新增：標點符號正則
+    punctuation_chars = r"，,。.？?！!：:；;、「“」”『‘』’（(）)【[】]《{》}—‧…"  # 你也可以從 punctuation.json 載入
+    punctuation_pattern = f"[{re.escape(punctuation_chars)}]"
+
+    # rushio 在前，拼音在中，標點在後
+    full_pattern = re.compile(f"({rushio_pattern}|{normal_pattern}|{punctuation_pattern})")
+
+    return [m.group(0) for m in full_pattern.finditer(text)]
 
 def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
     sixth_dot = ""
@@ -201,6 +205,8 @@ def convert_text_to_braille(text, dialect):
     rushio_file = os.path.join(DATA_DIR, rushio_filename)
     rushio = load_json(rushio_file)
 
+    punctuation_map = load_json(PUNCTUATION_FILE)
+
     lines = text.splitlines()
     final_lines = []
 
@@ -209,6 +215,12 @@ def convert_text_to_braille(text, dialect):
         braille_line = []
 
         for syll in syllables:
+            syll = syll.strip()
+            # 若是標點符號，直接轉換
+            if syll in punctuation_map:
+                braille_line.append(punctuation_map[syll])
+                continue
+
             result = parse_syllable(syll, consonants, vowels, tones, rushio, dialect)
             braille_line.append(result or "⍰")
 
