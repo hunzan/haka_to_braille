@@ -207,23 +207,65 @@ def convert_text_to_braille(text, dialect):
 
     punctuation_map = load_json(PUNCTUATION_FILE)
 
+    punct_need_space_after = set("。.,，：:；;！!」”』’）)】]》}—")
+    punct_need_space_before = set("「“『‘（(【[《{")
+
+    tone_braille_dot = "⠤"  # 這是點字 tone 第六點
+    braille_space = "\u2800"  # 點字空格 U+2800（完全正確寫法）
+
     lines = text.splitlines()
     final_lines = []
 
     for line in lines:
         syllables = split_syllables_auto(line.strip(), tones, rushio)
-        braille_line = []
+        braille_line = ""
+        syll_count = len(syllables)
 
-        for syll in syllables:
+        for idx, syll in enumerate(syllables):
             syll = syll.strip()
-            # 若是標點符號，直接轉換
+            if not syll:
+                continue  # 忽略多餘空格
+
+            # 標點處理
             if syll in punctuation_map:
-                braille_line.append(punctuation_map[syll])
+                braille_punct = punctuation_map[syll]
+
+                if syll in punct_need_space_before:
+                    braille_line += braille_space + braille_punct
+                else:
+                    braille_line += braille_punct
+
+                if syll in punct_need_space_after:
+                    braille_line += braille_space
                 continue
 
-            result = parse_syllable(syll, consonants, vowels, tones, rushio, dialect)
-            braille_line.append(result or "⍰")
+            # 音節處理
+            result = parse_syllable(syll, consonants, vowels, tones, rushio, dialect) or "⍰"
+            braille_line += result
 
-        final_lines.append(" ".join(braille_line))
+            # 判斷 syll 後面是否有原文空格
+            next_has_space = False
+            if idx + 1 < syll_count:
+                inter_text = line.split(syll, 1)[1].split(syllables[idx + 1], 1)[0]
+                if " " in inter_text:
+                    next_has_space = True
+
+            # 判斷 syll 是否有 tone（明眼標 tone）
+            has_tone_in_text = any(tone in syll for tone in tones if tone)
+
+            # 判斷 result 點字本身是否有 tone 點（第六點）
+            has_tone_in_braille = tone_braille_dot in result
+
+            if has_tone_in_text:
+                if next_has_space:
+                    braille_line += braille_space
+            else:
+                if has_tone_in_braille:
+                    continue
+                else:
+                    if not next_has_space:
+                        braille_line += braille_space
+
+        final_lines.append(braille_line.strip())
 
     return "\n".join(final_lines)
