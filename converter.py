@@ -187,6 +187,9 @@ RUSHIO_FILES = {
 }
 
 def convert_text_to_braille(text, dialect):
+    # 🟢 逗號前空格防呆處理
+    text = re.sub(r'\s+(，)', r'\1', text)
+
     if dialect in ["四縣", "南四縣"]:
         consonants = load_json(CONSONANTS_SIIAN2_FILE)
         tones = load_json(TONE_SIIAN2_FILE)
@@ -209,9 +212,8 @@ def convert_text_to_braille(text, dialect):
 
     punct_need_space_after = set("。，．,，：:；;！!」”』’）)】]》}—")
     punct_need_space_before = set("「“『‘（(【[《{")
-    sentence_end_punctuations = set("。．.")  # 句點符號
+    sentence_end_punctuations = set("。.！!？?")  # 句子結束符號
 
-    tone_braille_dot = "⠤"  # tone 第六點
     braille_space = "\u2800"  # 點字空格 U+2800
 
     lines = text.splitlines()
@@ -236,7 +238,9 @@ def convert_text_to_braille(text, dialect):
                     braille_line += braille_punct
                 else:
                     if syll in punct_need_space_before:
-                        braille_line += braille_space + braille_punct
+                        if len(braille_line) > 0:
+                            braille_line += braille_space
+                        braille_line += braille_punct
                     else:
                         braille_line += braille_punct
 
@@ -254,30 +258,28 @@ def convert_text_to_braille(text, dialect):
 
             # 判斷 syll 後面是否有原文空格
             next_has_space = False
+            is_space_after_tone = False
             if idx + 1 < syll_count:
                 inter_text = line.split(syll, 1)[1].split(syllables[idx + 1], 1)[0]
                 if " " in inter_text:
                     next_has_space = True
+                    # 檢查 syll 是否是 tone 結尾，下一個 syll 是否是拼音
+                    if any(tone in syll for tone in tones if tone):
+                        next_syll = syllables[idx + 1]
+                        if any(c.isalpha() for c in next_syll):  # 下一個是拼音
+                            is_space_after_tone = True
 
-            # 判斷 syll 是否有 tone（明眼標 tone）
-            has_tone_in_text = any(tone in syll for tone in tones if tone)
+            # ...後續決定是否加點字空格時：
+            if is_space_after_tone:
+                # 音調後的空格 → 不處理（不加點字空格）
+                pass
+            elif idx + 1 < syll_count and syllables[idx + 1] in sentence_end_punctuations:
+                # 句號類符號前不加空格
+                pass
+            elif next_has_space:
+                braille_line += braille_space
 
-            # 判斷 result 點字本身是否有 tone 點（第六點）
-            has_tone_in_braille = tone_braille_dot in result
-
-            # 特例：syll 後面是句點符號 → 不加空格
-            if idx + 1 < syll_count and syllables[idx + 1] in sentence_end_punctuations:
-                continue
-
-            if has_tone_in_text:
-                if next_has_space:
-                    braille_line += braille_space
-            else:
-                if has_tone_in_braille:
-                    continue
-                else:
-                    if not next_has_space:
-                        braille_line += braille_space
+        braille_line = re.sub(r'(⠲⠲⠲)(?!\u2800)', r'\1' + "\u2800", braille_line)
 
         final_lines.append(braille_line.strip())
 
