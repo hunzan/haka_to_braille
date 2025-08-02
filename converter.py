@@ -207,11 +207,12 @@ def convert_text_to_braille(text, dialect):
 
     punctuation_map = load_json(PUNCTUATION_FILE)
 
-    punct_need_space_after = set("。.,，：:；;！!」”』’）)】]》}—")
+    punct_need_space_after = set("。，．,，：:；;！!」”』’）)】]》}—")
     punct_need_space_before = set("「“『‘（(【[《{")
+    sentence_end_punctuations = set("。．.")  # 句點符號
 
-    tone_braille_dot = "⠤"  # 這是點字 tone 第六點
-    braille_space = "\u2800"  # 點字空格 U+2800（完全正確寫法）
+    tone_braille_dot = "⠤"  # tone 第六點
+    braille_space = "\u2800"  # 點字空格 U+2800
 
     lines = text.splitlines()
     final_lines = []
@@ -230,13 +231,21 @@ def convert_text_to_braille(text, dialect):
             if syll in punctuation_map:
                 braille_punct = punctuation_map[syll]
 
-                if syll in punct_need_space_before:
-                    braille_line += braille_space + braille_punct
-                else:
+                # 句點符號前永遠不加空格
+                if syll in sentence_end_punctuations:
                     braille_line += braille_punct
+                else:
+                    if syll in punct_need_space_before:
+                        braille_line += braille_space + braille_punct
+                    else:
+                        braille_line += braille_punct
 
-                if syll in punct_need_space_after:
-                    braille_line += braille_space
+                    # **核心修正：當標點後面是句點，這標點後面不加空格**
+                    if syll in punct_need_space_after:
+                        if idx + 1 < syll_count and syllables[idx + 1] in sentence_end_punctuations:
+                            pass  # 下一個是句點，不加空格
+                        else:
+                            braille_line += braille_space
                 continue
 
             # 音節處理
@@ -256,6 +265,10 @@ def convert_text_to_braille(text, dialect):
             # 判斷 result 點字本身是否有 tone 點（第六點）
             has_tone_in_braille = tone_braille_dot in result
 
+            # 特例：syll 後面是句點符號 → 不加空格
+            if idx + 1 < syll_count and syllables[idx + 1] in sentence_end_punctuations:
+                continue
+
             if has_tone_in_text:
                 if next_has_space:
                     braille_line += braille_space
@@ -269,3 +282,4 @@ def convert_text_to_braille(text, dialect):
         final_lines.append(braille_line.strip())
 
     return "\n".join(final_lines)
+
