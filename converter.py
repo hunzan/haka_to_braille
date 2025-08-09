@@ -229,6 +229,11 @@ def convert_text_to_braille(text, dialect):
             if syll in punctuation_map:
                 braille_punct = punctuation_map[syll]
 
+                # 🆕 特例：原文「 轉成點字 ⠦ 後面不加空格
+                if braille_punct == "⠦" and syll == "「":
+                    braille_line += braille_punct
+                    continue
+
                 # 句點符號前永遠不加空格
                 if syll in sentence_end_punctuations:
                     braille_line += braille_punct
@@ -247,11 +252,14 @@ def convert_text_to_braille(text, dialect):
                         else:
                             braille_line += braille_space
 
-                # 🆕 一律在三種句末點字符號後面補一顆點字空格（避免黏字）
-                #    這三個是：⠲（. / 。）、⠖（! / ！）、⠦（? / ？）
+                # 🆕 句末點字符號（⠲ .／。 、⠖ !／！ 、⠦ ?／？）
+                #    一般情況後面補一顆點字空格；但若下一個是結束型標點（ ） 」 』 】 ），則不補
                 if braille_punct in {"⠲", "⠖", "⠦"}:
-                    if not braille_line.endswith(braille_space):
-                        braille_line += braille_space
+                    next_token = syllables[idx + 1] if idx + 1 < syll_count else None
+                    closing_no_space = {"）","）",")","」","』","】","]"}
+                    if next_token not in closing_no_space:
+                        if not braille_line.endswith(braille_space):
+                            braille_line += braille_space
 
                 continue
 
