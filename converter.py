@@ -22,157 +22,152 @@ def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
-# ✅ 2. 自動分音節函式 ← 林北建議放這裡
+# ✅ 自動分音節（tokenizer）
+# 依「當前腔調 rushio 檔」之鍵名（自帶 tone）最長優先 → 先抓成套入聲音節
 def split_syllables_auto(text, tones, rushio):
+    # 1) rushio 鍵最長優先（自帶 tone 的整音節，如 iabˋ / ag / id / iogˋ ...）
     rushio_keys = sorted(rushio.keys(), key=len, reverse=True)
-    rushio_pattern = '|'.join(re.escape(k) for k in rushio_keys)
+    rushio_pattern = '|'.join(re.escape(k) for k in rushio_keys) if rushio_keys else r"(?!x)x"
 
-    tone_marks = sorted(tones.keys(), key=len, reverse=True)
-    escaped_marks = [re.escape(mark) for mark in tone_marks if mark]
+    # 2) 一般拼音 + 可選 tone（tone 自 tones.json，最長優先）
+    tone_marks = sorted([k for k in tones.keys() if k], key=len, reverse=True)
+    escaped_marks = [re.escape(mark) for mark in tone_marks]
     tone_pattern = f"(?:{'|'.join(escaped_marks)})?"
-    normal_pattern = f"[a-zA-Z]+{tone_pattern}"
 
-    # 新增：標點符號正則
-    punctuation_chars = r"，,。.？?！!：:；;、「“」”『‘』’（(）)【[】]《{》}—‧…"  # 你也可以從 punctuation.json 載入
+    # 拼音主體：連續字母 + 可選 tone
+    normal_pattern = f"[A-Za-z]+{tone_pattern}"
+
+    # 3) 標點
+    punctuation_chars = r"，,。.？?！!：:；;、「“」”『‘』’（(）)【[】]《{》}—‧…"
     punctuation_pattern = f"[{re.escape(punctuation_chars)}]"
 
-    # rushio 在前，拼音在中，標點在後
+    # ✅ 順序：rushio（帶調整音節） → 一般拼音 → 標點
     full_pattern = re.compile(f"({rushio_pattern}|{normal_pattern}|{punctuation_pattern})")
-
     return [m.group(0) for m in full_pattern.finditer(text)]
 
 def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
     sixth_dot = ""
-    syll = syll.strip()
+    s = syll.strip()
 
-    # ✅ 鼻音：若有 nn，加入第六點，並砍 nn 以利後續處理
-    if "nn" in syll:
+    # 1) 鼻化：nn → 第六點，並移除 nn 以利後續處理
+    if "nn" in s:
         sixth_dot = "⠠"
-        syll = syll.replace("nn", "")
+        s = s.replace("nn", "")
 
-    # ✅ 特例：處理 iim / iin（含子音或獨立）
-    base_syll = syll
+    # 2) 先處理「帶調的 rushio 整音節」（rushio 自帶 tone → 不再附加 tone）
+    if s in rushio:
+        dots = get_dots(rushio, s)
+        return (sixth_dot + dots) if sixth_dot else dots
+
+    # 3) 特例：iim / iin
+    #    注意：這條路徑允許前面有子音，結尾固定 m/n，最後仍可加 tone
+    #    （依你原始規則保留）
+    # 先把 tone 剝掉（最長優先）
     tone_mark = ""
-    for mark in tones:
-        if mark and mark in base_syll:
+    base = s
+    for mark in sorted([k for k in tones if k], key=len, reverse=True):
+        if mark in base:
             tone_mark = mark
-            base_syll = base_syll.replace(mark, "")
+            base = base.replace(mark, "")
             break
 
-    if base_syll.endswith("iim") or base_syll.endswith("iin"):
-        if base_syll.endswith("iim"):
-            base = base_syll[:-3]
-            coda = "m"
-        else:
-            base = base_syll[:-3]
-            coda = "n"
-
+    if base.endswith("iim") or base.endswith("iin"):
+        body = base[:-3]
+        coda_cons = "m" if base.endswith("iim") else "n"
         parts = [sixth_dot] if sixth_dot else []
+        if body:
+            if body in consonants:
+                parts.append(get_dots(consonants, body))
+            else:
+                return "⍰"
+        parts.append(get_dots(consonants, coda_cons))
+        parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
+        return "".join(parts)
 
-        if base:
-            if base in consonants:
+    # 4) 詔安腔額外 nn 相容處理（若仍有殘留）
+    if dialect == "詔安" and base.endswith("nn"):
+        sixth_dot = "⠠"
+        base = base[:-2]
+
+    # 5) 「子音 + rushio」：尾巴若直接是 rushio（自帶 tone），不加 tone
+    for r in sorted(rushio.keys(), key=len, reverse=True):
+        if base.endswith(r):
+            onset = base[:-len(r)]
+            if onset in consonants:
+                parts = [sixth_dot] if sixth_dot else []
+                parts.append(get_dots(consonants, onset))
+                parts.append(get_dots(rushio, r))
+                return "".join(parts)
+
+    # ===== 進入「鎖定韻母」流程 =====
+    # 規則：一旦韻母（vowels.json 的鍵）匹配成功，就鎖定，不再回頭重切。
+    cons_keys  = sorted(consonants.keys(), key=len, reverse=True)
+    vowel_keys = sorted(vowels.keys(),     key=len, reverse=True)
+
+    # 5.1 取最長起首子音（可為空）
+    onset = ""
+    rest = base
+    for c in cons_keys:
+        if rest.startswith(c):
+            onset = c
+            rest = rest[len(c):]
+            break
+
+    # 5.2 必須在當前 rest 開頭「一次」匹配到最長韻母，鎖定之
+    rime = ""
+    for v in vowel_keys:
+        if rest.startswith(v):
+            rime = v
+            rest = rest[len(v):]   # 這裡之後的內容一律視為「外加尾綴」
+            break
+    if not rime:
+        # 沒有韻母 → 嘗試單音節 m/n/ng
+        if base in ["m", "n", "ng"]:
+            parts = [sixth_dot] if sixth_dot else []
+            if base in vowels:
+                parts.append(get_dots(vowels, base))
+            elif base in consonants:
                 parts.append(get_dots(consonants, base))
             else:
                 return "⍰"
-        parts.append(get_dots(consonants, coda))
+            parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
+            return "".join(parts)
+        return "⍰"
 
-        if tone_mark:
-            parts.append(get_dots(tones, tone_mark))
-        else:
-            parts.append("⠤")
+    # 5.3 處理「外加尾綴」：只允許
+    #     (a) 整個尾綴是 rushio（自帶 tone）→ 不再加 tone
+    #     (b) 一連串子音（逐段最長匹配於 consonants），全部吃完 → 保留 tone
+    #     不可再去匹配韻母（避免重覆檢查）
+    parts = [sixth_dot] if sixth_dot else []
+    if onset:
+        parts.append(get_dots(consonants, onset))
+    parts.append(get_dots(vowels, rime))   # 韻母鎖定
 
-        return ''.join(parts)
+    # (a) 尾綴為 rushio：直接收、不加 tone
+    if rest:
+        if rest in rushio:
+            parts.append(get_dots(rushio, rest))
+            return "".join(parts)  # rushio 自帶 tone，結束
 
-    # ✅ 詔安腔 nn 特殊處理，加第六點
-    if dialect == "詔安" and syll.endswith("nn"):
-        sixth_dot = "⠠"
-        syll = syll[:-2]
+        # (b) 尾綴為一連串子音：用「最長優先」逐段吃完；任一段失敗就視為無效
+        tail = rest
+        while tail:
+            matched = False
+            for c in cons_keys:
+                if tail.startswith(c):
+                    parts.append(get_dots(consonants, c))
+                    tail = tail[len(c):]
+                    matched = True
+                    break
+            if not matched:
+                return "⍰"  # 尾綴既不是 rushio 也不是純子音序列 → 無效
+        # 吃完全部子音尾綴 → 之後仍可加 tone
+        parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
+        return "".join(parts)
 
-    # ✅ 改：直接用 syll（含 tone）查 rushio
-    if syll in rushio:
-        return sixth_dot + get_dots(rushio, syll)
-
-    # ✅ 嘗試拆解：子音 + rushio
-    for r in sorted(rushio.keys(), key=lambda x: -len(x)):
-        if syll.endswith(r):
-            onset = syll[:-len(r)]
-            if onset in consonants:
-                return sixth_dot + get_dots(consonants, onset) + get_dots(rushio, r)
-
-    # ✅ 沒有 match rushio → 現在才拆 tone
-    tone_mark = ""
-    base_syll = syll
-    for mark in tones:
-        if mark and mark in base_syll:
-            tone_mark = mark
-            base_syll = base_syll.replace(mark, "")
-            break
-
-    # 嘗試直接查母音
-    if base_syll in vowels:
-        parts = [sixth_dot, get_dots(vowels, base_syll)]
-        if tone_mark in tones:
-            parts.append(get_dots(tones, tone_mark))
-        else:
-            parts.append("⠤")
-        return ''.join(parts)
-
-    # 拆解正常音節（子音 + 母音 + coda）
-    onset, nucleus, coda = "", "", ""
-    remainder = base_syll
-
-    for c in sorted(consonants.keys(), key=len, reverse=True):
-        if remainder.startswith(c):
-            onset = c
-            remainder = remainder[len(c):]
-            break
-
-    for v in sorted(vowels.keys(), key=len, reverse=True):
-        if remainder.startswith(v):
-            nucleus = v
-            coda = remainder[len(v):]
-            break
-
-    is_rushio = False
-    if nucleus:
-        parts = [sixth_dot] if sixth_dot else []
-        if onset:
-            parts.append(get_dots(consonants, onset))
-        parts.append(get_dots(vowels, nucleus))
-
-        if coda:
-            if coda in rushio:
-                parts.append(get_dots(rushio, coda))
-                is_rushio = True
-            elif coda in consonants:
-                parts.append(get_dots(consonants, coda))
-            else:
-                return "⍰"
-
-        if not is_rushio:
-            if tone_mark:
-                parts.append(get_dots(tones, tone_mark))
-            else:
-                parts.append("⠤")
-
-        return ''.join(parts)
-
-    # 處理單音節 m, n, ng
-    if base_syll in ["m", "n", "ng"]:
-        parts = [sixth_dot] if sixth_dot else []
-        if base_syll in vowels:
-            parts.append(get_dots(vowels, base_syll))
-        elif base_syll in consonants:
-            parts.append(get_dots(consonants, base_syll))
-        else:
-            return "⍰"
-        if tone_mark in tones:
-            parts.append(get_dots(tones, tone_mark))
-        else:
-            parts.append("⠤")
-        return ''.join(parts)
-
-    return "⍰"
+    # (尾綴為空) 正常加 tone
+    parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
+    return "".join(parts)
 
 def get_dots(dictionary, key):
     return dictionary.get(key, {}).get("dots", "")
@@ -220,6 +215,7 @@ def convert_text_to_braille(text, dialect):
     final_lines = []
 
     for line in lines:
+        # ✅ 這裡使用「當前腔調 rushio 鍵（自帶 tone）最長優先」來粗切
         syllables = split_syllables_auto(line.strip(), tones, rushio)
         braille_line = ""
         syll_count = len(syllables)
@@ -250,6 +246,13 @@ def convert_text_to_braille(text, dialect):
                             pass  # 下一個是句點，不加空格
                         else:
                             braille_line += braille_space
+
+                # 🆕 一律在三種句末點字符號後面補一顆點字空格（避免黏字）
+                #    這三個是：⠲（. / 。）、⠖（! / ！）、⠦（? / ？）
+                if braille_punct in {"⠲", "⠖", "⠦"}:
+                    if not braille_line.endswith(braille_space):
+                        braille_line += braille_space
+
                 continue
 
             # 音節處理
@@ -279,9 +282,9 @@ def convert_text_to_braille(text, dialect):
             elif next_has_space:
                 braille_line += braille_space
 
+        # 三個句點（省略號）後補一個點字空格（避免黏住）
         braille_line = re.sub(r'(⠲⠲⠲)(?!\u2800)', r'\1' + "\u2800", braille_line)
 
         final_lines.append(braille_line.strip())
 
     return "\n".join(final_lines)
-
