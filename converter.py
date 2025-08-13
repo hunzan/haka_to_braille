@@ -59,18 +59,16 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
         dots = get_dots(rushio, s)
         return (sixth_dot + dots) if sixth_dot else dots
 
-    # 3) 特例：iim / iin
-    #    注意：這條路徑允許前面有子音，結尾固定 m/n，最後仍可加 tone
-    #    （依你原始規則保留）
-    # 先把 tone 剝掉（最長優先）
+    # 3) 先剝 tone（最長優先），保留原 s（含 tone）給後面子音+rushio 判斷
     tone_mark = ""
     base = s
     for mark in sorted([k for k in tones if k], key=len, reverse=True):
-        if mark in base:
+        if mark and mark in base:
             tone_mark = mark
             base = base.replace(mark, "")
             break
 
+    # 4) 特例：iim / iin
     if base.endswith("iim") or base.endswith("iin"):
         body = base[:-3]
         coda_cons = "m" if base.endswith("iim") else "n"
@@ -84,27 +82,26 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
         parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
         return "".join(parts)
 
-    # 4) 詔安腔額外 nn 相容處理（若仍有殘留）
+    # 5) 詔安腔額外 nn 相容處理（若仍有殘留）
     if dialect == "詔安" and base.endswith("nn"):
         sixth_dot = "⠠"
         base = base[:-2]
 
-    # 5) 「子音 + rushio」：尾巴若直接是 rushio（自帶 tone），不加 tone
+    # 6) 「子音 + rushio」：只接受『帶調鍵』（用 s 而非 base 來比）
     for r in sorted(rushio.keys(), key=len, reverse=True):
-        if base.endswith(r):
-            onset = base[:-len(r)]
+        if s.endswith(r):  # r 例：'idˋ', 'agˋ', 'edˋ'（鍵名含調）
+            onset = s[:-len(r)]
             if onset in consonants:
                 parts = [sixth_dot] if sixth_dot else []
                 parts.append(get_dots(consonants, onset))
-                parts.append(get_dots(rushio, r))
+                parts.append(get_dots(rushio, r))  # rushio 自帶 tone
                 return "".join(parts)
 
     # ===== 進入「鎖定韻母」流程 =====
-    # 規則：一旦韻母（vowels.json 的鍵）匹配成功，就鎖定，不再回頭重切。
     cons_keys  = sorted(consonants.keys(), key=len, reverse=True)
     vowel_keys = sorted(vowels.keys(),     key=len, reverse=True)
 
-    # 5.1 取最長起首子音（可為空）
+    # 6.1 取最長起首子音（可為空）
     onset = ""
     rest = base
     for c in cons_keys:
@@ -113,12 +110,12 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
             rest = rest[len(c):]
             break
 
-    # 5.2 必須在當前 rest 開頭「一次」匹配到最長韻母，鎖定之
+    # 6.2 必須在當前 rest 開頭「一次」匹配到最長韻母，鎖定之
     rime = ""
     for v in vowel_keys:
         if rest.startswith(v):
             rime = v
-            rest = rest[len(v):]   # 這裡之後的內容一律視為「外加尾綴」
+            rest = rest[len(v):]   # 之後內容視為「外加尾綴」
             break
     if not rime:
         # 沒有韻母 → 嘗試單音節 m/n/ng
@@ -134,22 +131,25 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
             return "".join(parts)
         return "⍰"
 
-    # 5.3 處理「外加尾綴」：只允許
-    #     (a) 整個尾綴是 rushio（自帶 tone）→ 不再加 tone
-    #     (b) 一連串子音（逐段最長匹配於 consonants），全部吃完 → 保留 tone
-    #     不可再去匹配韻母（避免重覆檢查）
     parts = [sixth_dot] if sixth_dot else []
     if onset:
         parts.append(get_dots(consonants, onset))
     parts.append(get_dots(vowels, rime))   # 韻母鎖定
 
-    # (a) 尾綴為 rushio：直接收、不加 tone
+    # 6.3 處理「外加尾綴」
     if rest:
-        if rest in rushio:
-            parts.append(get_dots(rushio, rest))
-            return "".join(parts)  # rushio 自帶 tone，結束
+        # (a) 優先嘗試『尾綴+tone』是否剛好是 rushio 的帶調鍵
+        rest_toned = (rest + tone_mark) if tone_mark else rest
+        if rest_toned in rushio:
+            parts.append(get_dots(rushio, rest_toned))  # 自帶 tone
+            return "".join(parts)
 
-        # (b) 尾綴為一連串子音：用「最長優先」逐段吃完；任一段失敗就視為無效
+        # （相容舊資料）若需要，也可接受無調鍵
+        if rest in rushio:
+            parts.append(get_dots(rushio, rest))  # 自帶 tone（由點字定義）
+            return "".join(parts)
+
+        # (b) 否則僅允許純子音尾綴（逐段最長匹配）
         tail = rest
         while tail:
             matched = False
@@ -160,7 +160,7 @@ def parse_syllable(syll, consonants, vowels, tones, rushio, dialect):
                     matched = True
                     break
             if not matched:
-                return "⍰"  # 尾綴既不是 rushio 也不是純子音序列 → 無效
+                return "⍰"  # 既不是 rushio 也不是純子音序列 → 無效
         # 吃完全部子音尾綴 → 之後仍可加 tone
         parts.append(get_dots(tones, tone_mark) if tone_mark else "⠤")
         return "".join(parts)
